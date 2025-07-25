@@ -37,70 +37,48 @@ Before starting, search for and confirm the latest stable versions of:
 - @supabase/ssr
 - shadcn/ui compatibility with current Next.js/Tailwind versions
 
-### Step 2: Initialize Project
+### Step 2: Prepare for Project Initialization
+**IMPORTANT**: Before running `create-next-app`, check if the current directory has any files:
+1. If there are existing files (like README.md, SETUP_PLAN.md), temporarily move them to the parent directory
+2. Run the initialization command
+3. Move the files back after initialization
+
+### Step 3: Initialize Project
 ```bash
-pnpm create next-app@latest nextjs-template --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"
-cd nextjs-template
+# If directory has files, move them first:
+# mv * ../temp_backup/
+
+# Then initialize (use printf to auto-answer prompts):
+printf "n\n" | pnpm create next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"
+
+# Move files back if needed:
+# mv ../temp_backup/* .
 ```
 
-### Step 3: Install Dependencies
+### Step 4: Install Dependencies
 Install all required packages with their latest versions:
 ```bash
 pnpm add @supabase/supabase-js @supabase/ssr prisma @prisma/client
 pnpm add -D @types/node
 ```
 
-### Step 4: Create Project Structure
-Create the following directory structure:
-```
-src/
-├── app/
-│   ├── (auth)/
-│   │   ├── login/
-│   │   │   └── page.tsx
-│   │   ├── register/
-│   │   │   └── page.tsx
-│   │   ├── verify/
-│   │   │   └── page.tsx
-│   │   └── reset-password/
-│   │       └── page.tsx
-│   ├── (dashboard)/
-│   │   ├── dashboard/
-│   │   │   └── page.tsx
-│   │   ├── profile/
-│   │   │   └── page.tsx
-│   │   └── settings/
-│   │       └── page.tsx
-│   ├── api/
-│   │   └── auth/
-│   │       └── callback/
-│   │           └── route.ts
-│   ├── layout.tsx
-│   └── page.tsx
-├── components/
-│   ├── ui/           # shadcn/ui components
-│   ├── auth/         # Auth-related components
-│   ├── layout/       # Layout components (navbar, footer)
-│   └── features/     # Feature-specific components
-├── lib/
-│   ├── supabase/
-│   │   ├── client.ts
-│   │   ├── server.ts
-│   │   └── middleware.ts
-│   ├── prisma/
-│   │   └── client.ts
-│   └── utils/
-│       └── cn.ts
-├── hooks/
-│   └── use-user.ts
-├── types/
-│   └── index.ts
-└── styles/
-    └── globals.css
+### Step 5: Create Project Structure
+**IMPORTANT**: Use proper escaping for parentheses in bash commands:
+```bash
+# Create directories with proper escaping for route groups
+mkdir -p src/app/\(auth\)/{login,register,verify,reset-password}
+mkdir -p src/app/\(auth\)/reset-password/update
+mkdir -p src/app/\(dashboard\)/{dashboard,profile,settings}
+mkdir -p src/app/api/auth/callback
+mkdir -p src/app/api/profile
+mkdir -p src/components/{ui,auth,layout,features}
+mkdir -p src/lib/{supabase,prisma,utils}
+mkdir -p src/hooks src/types src/styles
+mkdir -p .vscode
 ```
 
-### Step 5: Environment Configuration
-Create `.env.local` with these variables (user will fill in values):
+### Step 6: Environment Configuration
+Create both `.env.local` and `.env.example` with these variables:
 ```env
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
@@ -117,16 +95,16 @@ DIRECT_URL="postgres://[user].[project-ref]:[password]@[region].pooler.supabase.
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-### Step 6: Configure Prisma
+### Step 7: Configure Prisma
 1. Initialize Prisma:
 ```bash
 pnpm prisma init
 ```
 
-2. Update `prisma/schema.prisma`:
+2. **IMPORTANT**: Replace the entire `prisma/schema.prisma` file (don't just edit):
 ```prisma
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -149,166 +127,125 @@ model Profile {
 }
 ```
 
-### Step 7: Install shadcn/ui
-1. Initialize shadcn/ui (use canary if needed for latest compatibility):
+### Step 8: Install shadcn/ui
+**IMPORTANT**: Use printf to auto-answer prompts:
 ```bash
-npx shadcn@latest init
+# Initialize with auto-answer (chooses default Neutral color)
+printf "y\n" | npx shadcn@latest init
+
+# Install all components with --yes flag
+npx shadcn@latest add --all --yes
 ```
 
-2. Install ALL components:
-```bash
-npx shadcn@latest add --all
+### Step 9: Update Root Layout
+**IMPORTANT**: The root layout needs to import and include the Navbar component:
+```tsx
+import { Navbar } from "@/components/layout/navbar";
+// ... other imports
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <Navbar />
+        <main className="min-h-screen">{children}</main>
+      </body>
+    </html>
+  );
+}
 ```
 
-### Step 8: Implement Supabase Clients
-Create the following Supabase client files:
+### Step 10: Create API Routes First
+**IMPORTANT**: Create API routes before pages that use them:
+1. Create `/api/profile/route.ts` for profile updates
+2. Create `/api/auth/callback/route.ts` for auth callbacks
 
-**src/lib/supabase/client.ts** - Browser client
-**src/lib/supabase/server.ts** - Server client for Server Components
-**src/lib/supabase/middleware.ts** - Middleware client
+### Step 11: Implement Middleware Early
+**IMPORTANT**: Create middleware before testing protected routes:
+1. Create `src/middleware.ts` with the main middleware logic
+2. Update `src/lib/supabase/middleware.ts` to include route protection logic
 
-### Step 9: Create Authentication Components
-Implement these auth components:
-- Login form with email/password
-- Registration form with email verification
-- Password reset form
-- Email verification handler
-- Auth context/provider
-
-### Step 10: Build Layout Components
-Create a responsive navbar that includes:
-- Logo/brand
-- Navigation links
-- User menu (when authenticated)
-- Mobile menu toggle
-- Theme toggle (optional)
-
-### Step 11: Implement Middleware
-Create `src/middleware.ts` for:
-- Protecting dashboard routes
-- Redirecting authenticated users from auth pages
-- Handling auth callbacks
-
-### Step 12: Create Core Pages
-Implement these pages:
-- Landing page
-- Dashboard
-- User profile
-- Settings
-- 404 page
-
-### Step 13: Set Up Database
-1. Create Supabase project (user will do this)
-2. Run this SQL in Supabase SQL editor to create profile sync:
-```sql
--- Create profile on user signup
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
-BEGIN
-  INSERT INTO public.profiles (id, email)
-  VALUES (new.id, new.email);
-  RETURN new;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Trigger the function every time a user is created
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
-
--- Set up RLS
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view own profile" ON profiles
-  FOR SELECT USING (auth.uid() = id);
-
-CREATE POLICY "Users can update own profile" ON profiles
-  FOR UPDATE USING (auth.uid() = id);
-```
-
-### Step 14: Configure Email Templates
-In Supabase dashboard, customize email templates for:
-- Confirmation email
-- Password reset
-- Magic link (if using)
-
-### Step 15: Add TypeScript Types
-Create proper TypeScript types for:
-- Database models
-- Supabase auth types
-- Component props
-
-### Step 16: Implement Error Handling
-Add proper error boundaries and error pages:
-- Global error boundary
-- Not found pages
-- Error logging
-
-### Step 17: Development Tools
-Set up:
-- ESLint configuration
-- Prettier
-- VS Code settings
-- Git ignore patterns
-
-### Step 18: Create Helper Scripts
-Add to package.json:
+### Step 12: Package.json Scripts
+**IMPORTANT**: Update package.json scripts (remove --turbopack if present):
 ```json
 {
   "scripts": {
-    "db:push": "prisma db push",
-    "db:generate": "prisma generate",
-    "db:studio": "prisma studio",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "db:studio": "prisma studio"
   }
 }
 ```
 
-## Important Implementation Notes
+### Step 13: Create Components in Order
+Create components in this specific order to avoid missing dependencies:
+1. Types (`src/types/index.ts`)
+2. Supabase clients (`src/lib/supabase/*.ts`)
+3. Hooks (`src/hooks/use-user.ts`)
+4. Auth components (`src/components/auth/*.tsx`)
+5. Layout components (`src/components/layout/*.tsx`)
+6. Feature components (`src/components/features/*.tsx`)
+7. Pages (`src/app/**/*.tsx`)
 
-### Authentication Flow
-1. User signs up with email/password
-2. Supabase sends verification email automatically
-3. User clicks link or enters code
-4. Profile is created via database trigger
-5. User is redirected to dashboard
+### Step 14: Handle File Creation Properly
+**IMPORTANT** for file operations:
+- Always use `Write` for new files (don't use `Edit` on non-existent files)
+- For existing files that need complete replacement, read first then write
+- Create parent directories before creating files
+- Remove and recreate README.md if needed instead of trying to edit
 
-### Security Considerations
-- Enable RLS on all tables
-- Never expose service role key to client
-- Validate all inputs
-- Use server-side session checks
-- Implement rate limiting
+### Step 15: Create Supporting Files
+Don't forget these important files:
+1. `.prettierrc` - Prettier configuration
+2. `.vscode/settings.json` - VS Code settings
+3. `supabase-setup.sql` - Database setup script
+4. Update `.gitignore` to include `!.env.example`
 
-### Performance Optimizations
-- Use React Server Components by default
-- Implement proper loading states
-- Use next/image for images
-- Configure proper caching headers
+### Step 16: Error Page Implementation
+Create error handling pages:
+1. `src/app/error.tsx` - Client-side error boundary
+2. `src/app/not-found.tsx` - 404 page
+3. Include proper error states in forms
 
-### Code Style
-- Use TypeScript strictly
-- Follow Next.js conventions
-- Keep components small and focused
-- Use proper error handling
-- Implement proper loading states
+### Step 17: Add Missing Features
+Ensure all features are implemented:
+1. Update password form at `/reset-password/update`
+2. Profile API route for updating user profiles
+3. Account settings with delete account option
+4. Security settings for password changes
+
+## Common Pitfalls to Avoid
+
+1. **Directory Creation**: Always escape parentheses in bash commands when creating route groups
+2. **File Creation**: Use `Write` for new files, not `Edit`
+3. **Prompts**: Use `printf` to auto-answer interactive prompts
+4. **Import Order**: Create dependencies before files that use them
+5. **Middleware**: Implement route protection in the middleware client, not just the main middleware
+6. **API Routes**: Create API routes before pages that call them
+7. **Package.json**: Remove `--turbopack` flag if it causes issues
 
 ## Validation Checklist
 After building, verify:
 - [ ] All routes work correctly
 - [ ] Authentication flow is complete
 - [ ] Email verification works
-- [ ] Password reset works
+- [ ] Password reset works with update form
 - [ ] Protected routes redirect properly
-- [ ] Navbar is responsive
+- [ ] Navbar is responsive and shows user state
 - [ ] All shadcn/ui components are installed
-- [ ] TypeScript has no errors
+- [ ] TypeScript has no errors (`pnpm type-check`)
 - [ ] Environment variables are documented
 - [ ] Database migrations work
+- [ ] Profile updates work through API
 
 ## Final Notes
 This template should provide a production-ready starting point for Next.js applications. Ensure all features work correctly before considering the task complete. The user should be able to:
