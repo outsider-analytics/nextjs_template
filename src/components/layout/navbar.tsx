@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useUser } from '@/hooks/use-user'
@@ -17,17 +17,34 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { cn } from '@/lib/utils'
 
 export function Navbar() {
   const { user, loading } = useUser()
   const [isOpen, setIsOpen] = useState(false)
+  const [isNavigating, setIsNavigating] = useState(false)
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null)
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
 
+  const handleNavigation = (href: string) => {
+    setIsNavigating(true)
+    setNavigatingTo(href)
+    router.push(href)
+    // Reset after navigation completes
+    setTimeout(() => {
+      setIsNavigating(false)
+      setNavigatingTo(null)
+    }, 500)
+  }
+
   const handleSignOut = async () => {
+    setIsNavigating(true)
     await supabase.auth.signOut()
     router.push('/')
     router.refresh()
+    setIsNavigating(false)
   }
 
   const navItems = user
@@ -43,7 +60,14 @@ export function Navbar() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
-            <Link href="/" className="flex items-center space-x-2">
+            <Link 
+              href="/" 
+              className="flex items-center space-x-2"
+              onClick={(e) => {
+                e.preventDefault()
+                handleNavigation('/')
+              }}
+            >
               <span className="text-2xl font-bold">Logo</span>
             </Link>
             <div className="hidden md:block">
@@ -52,7 +76,17 @@ export function Navbar() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:text-primary"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      handleNavigation(item.href)
+                    }}
+                    className={cn(
+                      "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      pathname === item.href
+                        ? "text-primary"
+                        : "text-muted-foreground hover:text-primary",
+                      (isNavigating && navigatingTo === item.href) && "opacity-50 pointer-events-none"
+                    )}
                   >
                     {item.label}
                   </Link>
@@ -83,26 +117,61 @@ export function Navbar() {
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile">Profile</Link>
+                    <DropdownMenuItem 
+                      asChild 
+                      disabled={isNavigating}
+                      className={cn(isNavigating && "opacity-50")}
+                    >
+                      <Link 
+                        href="/profile"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          handleNavigation('/profile')
+                        }}
+                      >
+                        Profile
+                      </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/settings">Settings</Link>
+                    <DropdownMenuItem 
+                      asChild 
+                      disabled={isNavigating}
+                      className={cn(isNavigating && "opacity-50")}
+                    >
+                      <Link 
+                        href="/settings"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          handleNavigation('/settings')
+                        }}
+                      >
+                        Settings
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut}>
+                    <DropdownMenuItem 
+                      onClick={handleSignOut}
+                      disabled={isNavigating}
+                      className={cn(isNavigating && "opacity-50")}
+                    >
                       Sign out
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
                 <div className="flex items-center space-x-4">
-                  <Link href="/login">
-                    <Button variant="ghost">Login</Button>
-                  </Link>
-                  <Link href="/register">
-                    <Button>Sign up</Button>
-                  </Link>
+                  <Button 
+                    variant="ghost"
+                    disabled={isNavigating}
+                    onClick={() => handleNavigation('/login')}
+                  >
+                    Login
+                  </Button>
+                  <Button
+                    disabled={isNavigating}
+                    onClick={() => handleNavigation('/register')}
+                  >
+                    Sign up
+                  </Button>
                 </div>
               )}
             </div>
@@ -125,8 +194,16 @@ export function Navbar() {
                         <Link
                           key={item.href}
                           href={item.href}
-                          className="block rounded-lg px-3 py-2 text-base font-semibold leading-7 hover:bg-gray-50"
-                          onClick={() => setIsOpen(false)}
+                          className={cn(
+                            "block rounded-lg px-3 py-2 text-base font-semibold leading-7 hover:bg-muted",
+                            pathname === item.href && "bg-muted",
+                            (isNavigating && navigatingTo === item.href) && "opacity-50 pointer-events-none"
+                          )}
+                          onClick={(e) => {
+                            e.preventDefault()
+                            handleNavigation(item.href)
+                            setIsOpen(false)
+                          }}
                         >
                           {item.label}
                         </Link>
@@ -143,6 +220,7 @@ export function Navbar() {
                           <Button
                             variant="outline"
                             className="w-full"
+                            disabled={isNavigating}
                             onClick={() => {
                               handleSignOut()
                               setIsOpen(false)
@@ -153,14 +231,27 @@ export function Navbar() {
                         </div>
                       ) : (
                         <div className="space-y-2">
-                          <Link href="/login" onClick={() => setIsOpen(false)}>
-                            <Button variant="outline" className="w-full">
-                              Login
-                            </Button>
-                          </Link>
-                          <Link href="/register" onClick={() => setIsOpen(false)}>
-                            <Button className="w-full">Sign up</Button>
-                          </Link>
+                          <Button 
+                            variant="outline" 
+                            className="w-full"
+                            disabled={isNavigating}
+                            onClick={() => {
+                              handleNavigation('/login')
+                              setIsOpen(false)
+                            }}
+                          >
+                            Login
+                          </Button>
+                          <Button 
+                            className="w-full"
+                            disabled={isNavigating}
+                            onClick={() => {
+                              handleNavigation('/register')
+                              setIsOpen(false)
+                            }}
+                          >
+                            Sign up
+                          </Button>
                         </div>
                       )}
                     </div>
