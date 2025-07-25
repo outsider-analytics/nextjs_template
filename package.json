@@ -10,7 +10,9 @@
     "type-check": "tsc --noEmit",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "validate-env": "node scripts/validate-env.js",
+    "setup:db": "curl -X POST http://localhost:3000/api/setup/database -H 'Content-Type: application/json' -H 'X-Setup-Secret: development-only'"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.0",
@@ -70,6 +72,7 @@
     "@types/node": "^20.19.9",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.2.1",
     "eslint": "^9",
     "eslint-config-next": "15.4.4",
     "tailwindcss": "^4",

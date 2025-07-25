@@ -71,11 +71,34 @@ mkdir -p src/app/\(auth\)/reset-password/update
 mkdir -p src/app/\(dashboard\)/{dashboard,profile,settings}
 mkdir -p src/app/api/auth/callback
 mkdir -p src/app/api/profile
+mkdir -p src/app/api/setup/database
 mkdir -p src/components/{ui,auth,layout,features}
 mkdir -p src/lib/{supabase,prisma,utils}
 mkdir -p src/hooks src/types src/styles
-mkdir -p .vscode
+mkdir -p .vscode docs scripts
 ```
+
+### Step 5.5: Configure Application Details
+**IMPORTANT**: Create application configuration before proceeding:
+
+1. Create `APP_CONFIG.md` with application details:
+```markdown
+# Application Configuration
+
+## Application Details
+- **App Name**: [YOUR_APP_NAME] (Update this!)
+- **App URL**: http://localhost:3000 (Update in production)
+- **Company/Organization**: [YOUR_COMPANY]
+- **Support Email**: [YOUR_SUPPORT_EMAIL]
+- **Brand Color**: #000000 (Update to match your brand)
+```
+
+2. Create `docs/SUPABASE_EMAIL_SETUP.md` with email template instructions
+
+3. **STOP AND CONFIGURE**: Before proceeding, ensure the user has:
+   - [ ] Updated APP_CONFIG.md with their actual app name
+   - [ ] Chosen their brand colors
+   - [ ] Set their support email
 
 ### Step 6: Environment Configuration
 Create both `.env.local` and `.env.example` with these variables:
@@ -94,6 +117,37 @@ DIRECT_URL="postgres://[user].[project-ref]:[password]@[region].pooler.supabase.
 # App Configuration
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
+
+### Step 6.5: Verify Environment Configuration
+**CRITICAL**: Before proceeding, verify all environment variables are properly set:
+
+1. Create `scripts/validate-env.js`:
+```javascript
+const required = [
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'DATABASE_URL',
+  'DIRECT_URL'
+];
+
+const missing = required.filter(key => !process.env[key]);
+if (missing.length > 0) {
+  console.error('Missing required environment variables:', missing);
+  process.exit(1);
+}
+console.log('✅ All required environment variables are set!');
+```
+
+2. Run validation:
+```bash
+node scripts/validate-env.js
+```
+
+3. **STOP if validation fails!** The user must:
+   - [ ] Create a Supabase project
+   - [ ] Copy all credentials from Supabase dashboard
+   - [ ] Ensure DATABASE_URL uses port 5432
+   - [ ] Ensure DIRECT_URL uses port 6543
 
 ### Step 7: Configure Prisma
 1. Initialize Prisma:
@@ -163,6 +217,7 @@ export default function RootLayout({
 **IMPORTANT**: Create API routes before pages that use them:
 1. Create `/api/profile/route.ts` for profile updates
 2. Create `/api/auth/callback/route.ts` for auth callbacks
+3. Create `/api/setup/database/route.ts` for database initialization (development only)
 
 ### Step 11: Implement Middleware Early
 **IMPORTANT**: Create middleware before testing protected routes:
@@ -181,7 +236,9 @@ export default function RootLayout({
     "type-check": "tsc --noEmit",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "validate-env": "node scripts/validate-env.js",
+    "setup:db": "node scripts/setup-database.js"
   }
 }
 ```
@@ -223,6 +280,34 @@ Ensure all features are implemented:
 3. Account settings with delete account option
 4. Security settings for password changes
 
+### Step 18: Initialize Database
+**IMPORTANT**: The database must be initialized before the app will work properly.
+
+Option 1: Manual Setup (Recommended)
+1. Go to Supabase SQL Editor
+2. Copy contents of `supabase-setup.sql`
+3. Run the SQL script
+4. Verify tables were created
+
+Option 2: Automated Setup (Development Only)
+```bash
+# Start the dev server first
+pnpm dev
+
+# In another terminal, run:
+curl -X POST http://localhost:3000/api/setup/database \
+  -H "Content-Type: application/json" \
+  -H "X-Setup-Secret: development-only"
+```
+
+### Step 19: Configure Email Templates
+**CRITICAL**: Update Supabase email templates with your app name:
+1. Go to Supabase Dashboard → Authentication → Email Templates
+2. Enable custom emails for each template
+3. Copy templates from `APP_CONFIG.md`
+4. Replace `{APP_NAME}` with your actual app name
+5. Save each template
+
 ## Common Pitfalls to Avoid
 
 1. **Directory Creation**: Always escape parentheses in bash commands when creating route groups
@@ -232,6 +317,16 @@ Ensure all features are implemented:
 5. **Middleware**: Implement route protection in the middleware client, not just the main middleware
 6. **API Routes**: Create API routes before pages that call them
 7. **Package.json**: Remove `--turbopack` flag if it causes issues
+8. **Environment Variables**: Always validate env vars before proceeding
+9. **App Configuration**: Ensure APP_CONFIG.md is filled out before building components
+
+## Pre-Flight Checklist
+Before starting development, verify:
+- [ ] APP_CONFIG.md has been updated with actual app details
+- [ ] All environment variables are set (`pnpm validate-env`)
+- [ ] Supabase project is created and accessible
+- [ ] Database connection strings use correct ports
+- [ ] Email templates are configured in Supabase
 
 ## Validation Checklist
 After building, verify:
@@ -243,15 +338,18 @@ After building, verify:
 - [ ] Navbar is responsive and shows user state
 - [ ] All shadcn/ui components are installed
 - [ ] TypeScript has no errors (`pnpm type-check`)
-- [ ] Environment variables are documented
-- [ ] Database migrations work
+- [ ] Environment variables are validated (`pnpm validate-env`)
+- [ ] Database is initialized and accessible
 - [ ] Profile updates work through API
+- [ ] Email templates use correct app name
 
 ## Final Notes
 This template should provide a production-ready starting point for Next.js applications. Ensure all features work correctly before considering the task complete. The user should be able to:
 1. Clone the repo
-2. Add their Supabase credentials
-3. Run database setup
-4. Start developing immediately
+2. Configure APP_CONFIG.md
+3. Add their Supabase credentials
+4. Run database setup
+5. Configure email templates
+6. Start developing immediately
 
 Remember to search for and use the latest stable versions of all packages!
