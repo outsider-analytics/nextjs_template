@@ -4,11 +4,11 @@ This document contains important configuration details about the application tha
 
 ## Application Details
 
-- **App Name**: NextJS Template (Update this to your actual app name)
+- **App Name**: property management squared
 - **App URL**: http://localhost:3000 (Update in production)
-- **Company/Organization**: Your Company Name
-- **Support Email**: support@yourcompany.com
-- **Brand Color**: #000000 (Update to match your brand)
+- **Company/Organization**: Outsider Analytics LLC
+- **Support Email**: brian@outsideranalytics.xyz
+- **Brand Color**: #b6d7a8 (Update to match your brand)
 
 ## Email Templates Configuration
 
