@@ -39,20 +39,27 @@ Before starting, search for and confirm the latest stable versions of:
 
 ### Step 2: Prepare for Project Initialization
 **IMPORTANT**: Before running `create-next-app`, check if the current directory has any files:
-1. If there are existing files (like README.md, SETUP_PLAN.md), temporarily move them to the parent directory
+1. If there are existing files (including hidden files like .env.local), temporarily move them to a backup directory
 2. Run the initialization command
-3. Move the files back after initialization
+3. Move the files back after initialization, except for .env.local which should remain excluded
 
 ### Step 3: Initialize Project
 ```bash
-# If directory has files, move them first:
-# mv * ../temp_backup/
+# Create backup directory
+mkdir -p ../temp_backup
+
+# Move all files including hidden files (except .git)
+find . -maxdepth 1 ! -name . ! -name .git -exec mv {} ../temp_backup/ \;
 
 # Then initialize (use printf to auto-answer prompts):
 printf "n\n" | pnpm create next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"
 
-# Move files back if needed:
-# mv ../temp_backup/* .
+# Move files back except .env files
+find ../temp_backup -maxdepth 1 -type f ! -name ".env*" -exec mv {} . \;
+find ../temp_backup -maxdepth 1 -type d ! -name "temp_backup" -exec mv {} . \;
+
+# Clean up backup directory
+rm -rf ../temp_backup
 ```
 
 ### Step 4: Install Dependencies
