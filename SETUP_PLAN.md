@@ -10,6 +10,7 @@ You are tasked with building a production-ready Next.js template with the follow
 - **TypeScript** with strict mode
 - **Tailwind CSS** (verify if v4 is stable or use latest v3)
 - **App Router** (not Pages Router)
+- **TanStack Query** (React Query) for server state management
 
 ### Database & Authentication
 - **Supabase** for database (PostgreSQL) and authentication
@@ -35,6 +36,7 @@ Before starting, search for and confirm the latest stable versions of:
 - Prisma
 - @supabase/supabase-js
 - @supabase/ssr
+- @tanstack/react-query
 - shadcn/ui compatibility with current Next.js/Tailwind versions
 
 ### Step 2: Prepare for Project Initialization
@@ -63,26 +65,22 @@ rm -rf ../temp_backup
 ```
 
 ### Step 4: Install Dependencies
-Install all required packages with their latest versions:
+Install all required packages with their latest versions (batch installation for efficiency):
 ```bash
-pnpm add @supabase/supabase-js @supabase/ssr prisma @prisma/client
-pnpm add -D @types/node
+pnpm add @supabase/supabase-js @supabase/ssr prisma @prisma/client @tanstack/react-query @tanstack/react-query-devtools
+pnpm add -D @types/node dotenv
 ```
 
 ### Step 5: Create Project Structure
-**IMPORTANT**: Use proper escaping for parentheses in bash commands:
+**IMPORTANT**: Create all directories in one command for efficiency:
 ```bash
-# Create directories with proper escaping for route groups
-mkdir -p src/app/\(auth\)/{login,register,verify,reset-password}
-mkdir -p src/app/\(auth\)/reset-password/update
-mkdir -p src/app/\(dashboard\)/{dashboard,profile,settings}
-mkdir -p src/app/api/auth/callback
-mkdir -p src/app/api/profile
-mkdir -p src/app/api/setup/database
-mkdir -p src/components/{ui,auth,layout,features}
-mkdir -p src/lib/{supabase,prisma,utils}
-mkdir -p src/hooks src/types src/styles
-mkdir -p .vscode docs scripts
+mkdir -p src/app/\(auth\)/{login,register,verify,reset-password,reset-password/update} \
+         src/app/\(dashboard\)/{dashboard,profile,settings} \
+         src/app/api/{auth/callback,profile,setup/database} \
+         src/components/{ui,auth,layout,features} \
+         src/lib/{supabase,prisma,utils,tanstack-query} \
+         src/{hooks,types,styles} \
+         {.vscode,docs,scripts}
 ```
 
 ### Step 5.5: Configure Application Details
@@ -130,6 +128,8 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 1. Create `scripts/validate-env.js`:
 ```javascript
+require('dotenv').config({ path: '.env.local' });
+
 const required = [
   'NEXT_PUBLIC_SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
@@ -139,10 +139,24 @@ const required = [
 
 const missing = required.filter(key => !process.env[key]);
 if (missing.length > 0) {
-  console.error('Missing required environment variables:', missing);
+  console.error('❌ Missing required environment variables:', missing.join(', '));
   process.exit(1);
 }
+
+// Validate DATABASE_URL uses port 6543 for pooling
+if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes(':6543')) {
+  console.warn('⚠️  WARNING: DATABASE_URL should use port 6543 for connection pooling');
+}
+
+// Validate DIRECT_URL uses port 5432 for direct connections
+if (process.env.DIRECT_URL && !process.env.DIRECT_URL.includes(':5432')) {
+  console.warn('⚠️  WARNING: DIRECT_URL should use port 5432 for direct connections');
+}
+
 console.log('✅ All required environment variables are set!');
+console.log('🔗 Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+console.log('🔑 Supabase Anon Key:', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.substring(0, 20) + '...');
+console.log('🗄️  Database configured for Prisma');
 ```
 
 2. Run validation:
@@ -188,6 +202,11 @@ model Profile {
 }
 ```
 
+3. **CRITICAL**: Generate Prisma Client immediately:
+```bash
+pnpm db:generate
+```
+
 ### Step 8: Install shadcn/ui
 **IMPORTANT**: Use printf to auto-answer prompts:
 ```bash
@@ -198,10 +217,44 @@ printf "y\n" | npx shadcn@latest init
 npx shadcn@latest add --all --yes
 ```
 
-### Step 9: Update Root Layout
-**IMPORTANT**: The root layout needs to import and include the Navbar component:
+### Step 9: Set up TanStack Query
+**IMPORTANT**: Create the QueryClient provider before updating the root layout:
+
+1. Create `src/lib/tanstack-query/providers.tsx`:
+```tsx
+"use client";
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { useState } from "react";
+
+export function QueryProvider({ children }: { children: React.ReactNode }) {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 60 * 1000, // 1 minute
+            refetchOnWindowFocus: false,
+          },
+        },
+      })
+  );
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
+  );
+}
+```
+
+### Step 10: Update Root Layout
+**IMPORTANT**: The root layout needs to import and include the Navbar component and QueryProvider:
 ```tsx
 import { Navbar } from "@/components/layout/navbar";
+import { QueryProvider } from "@/lib/tanstack-query/providers";
 // ... other imports
 
 export default function RootLayout({
@@ -212,26 +265,28 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Navbar />
-        <main className="min-h-screen">{children}</main>
+        <QueryProvider>
+          <Navbar />
+          <main className="min-h-screen">{children}</main>
+        </QueryProvider>
       </body>
     </html>
   );
 }
 ```
 
-### Step 10: Create API Routes First
+### Step 11: Create API Routes First
 **IMPORTANT**: Create API routes before pages that use them:
 1. Create `/api/profile/route.ts` for profile updates
 2. Create `/api/auth/callback/route.ts` for auth callbacks
 3. Create `/api/setup/database/route.ts` for database initialization (development only)
 
-### Step 11: Implement Middleware Early
+### Step 12: Implement Middleware Early
 **IMPORTANT**: Create middleware before testing protected routes:
 1. Create `src/middleware.ts` with the main middleware logic
 2. Update `src/lib/supabase/middleware.ts` to include route protection logic
 
-### Step 12: Package.json Scripts
+### Step 13: Package.json Scripts
 **IMPORTANT**: Update package.json scripts (remove --turbopack if present):
 ```json
 {
@@ -250,44 +305,45 @@ export default function RootLayout({
 }
 ```
 
-### Step 13: Create Components in Order
+### Step 14: Create Components in Order
 Create components in this specific order to avoid missing dependencies:
 1. Types (`src/types/index.ts`)
 2. Supabase clients (`src/lib/supabase/*.ts`)
-3. Hooks (`src/hooks/use-user.ts`)
-4. Auth components (`src/components/auth/*.tsx`)
-5. Layout components (`src/components/layout/*.tsx`)
-6. Feature components (`src/components/features/*.tsx`)
-7. Pages (`src/app/**/*.tsx`)
+3. TanStack Query providers (`src/lib/tanstack-query/providers.tsx`)
+4. Hooks (`src/hooks/use-user.ts`) - Use TanStack Query for data fetching
+5. Auth components (`src/components/auth/*.tsx`)
+6. Layout components (`src/components/layout/*.tsx`)
+7. Feature components (`src/components/features/*.tsx`)
+8. Pages (`src/app/**/*.tsx`)
 
-### Step 14: Handle File Creation Properly
+### Step 15: Handle File Creation Properly
 **IMPORTANT** for file operations:
 - Always use `Write` for new files (don't use `Edit` on non-existent files)
 - For existing files that need complete replacement, read first then write
 - Create parent directories before creating files
 - Remove and recreate README.md if needed instead of trying to edit
 
-### Step 15: Create Supporting Files
+### Step 16: Create Supporting Files
 Don't forget these important files:
 1. `.prettierrc` - Prettier configuration
 2. `.vscode/settings.json` - VS Code settings
 3. `supabase-setup.sql` - Database setup script
 4. Update `.gitignore` to include `!.env.example`
 
-### Step 16: Error Page Implementation
+### Step 17: Error Page Implementation
 Create error handling pages:
 1. `src/app/error.tsx` - Client-side error boundary
 2. `src/app/not-found.tsx` - 404 page
 3. Include proper error states in forms
 
-### Step 17: Add Missing Features
+### Step 18: Add Missing Features
 Ensure all features are implemented:
 1. Update password form at `/reset-password/update`
 2. Profile API route for updating user profiles
 3. Account settings with delete account option
 4. Security settings for password changes
 
-### Step 18: Initialize Database
+### Step 19: Initialize Database
 **IMPORTANT**: The database must be initialized before the app will work properly.
 
 Option 1: Manual Setup (Recommended)
@@ -307,7 +363,7 @@ curl -X POST http://localhost:3000/api/setup/database \
   -H "X-Setup-Secret: development-only"
 ```
 
-### Step 19: Configure Email Templates
+### Step 20: Configure Email Templates
 **CRITICAL**: Update Supabase email templates with your app name:
 1. Go to Supabase Dashboard → Authentication → Email Templates
 2. Enable custom emails for each template
@@ -360,3 +416,36 @@ This template should provide a production-ready starting point for Next.js appli
 6. Start developing immediately
 
 Remember to search for and use the latest stable versions of all packages!
+
+## 📋 Quick Reference Commands
+
+For quick copy-paste during implementation:
+```bash
+# 1. Initialize project
+printf "n\n" | pnpm create next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"
+
+# 2. Install all dependencies
+pnpm add @supabase/supabase-js @supabase/ssr prisma @prisma/client @tanstack/react-query @tanstack/react-query-devtools
+pnpm add -D @types/node dotenv
+
+# 3. Create complete structure
+mkdir -p src/app/\(auth\)/{login,register,verify,reset-password,reset-password/update} \
+         src/app/\(dashboard\)/{dashboard,profile,settings} \
+         src/app/api/{auth/callback,profile,setup/database} \
+         src/components/{ui,auth,layout,features} \
+         src/lib/{supabase,prisma,utils,tanstack-query} \
+         src/{hooks,types,styles} \
+         {.vscode,docs,scripts}
+
+# 4. Setup Prisma
+pnpm prisma init
+# Replace schema.prisma content
+pnpm db:generate
+
+# 5. Install shadcn/ui
+printf "y\n" | npx shadcn@latest init
+npx shadcn@latest add --all --yes
+
+# 6. Validate everything
+pnpm validate-env && pnpm type-check && pnpm lint
+```
